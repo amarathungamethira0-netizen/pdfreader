@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF to Text Converter</title>
+    
+    <!-- PDF.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.min.js"></script>
+    
+    <!-- Tesseract.js for OCR (optional feature) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.5/tesseract.min.js"></script>
+    
+    <style>
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --bg-tertiary: #e9ecef;
+            --text-primary: #212529;
+            --text-secondary: #6c757d;
+            --accent: #0066cc;
+            --accent-hover: #0052a3;
+            --border: #dee2e6;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --shadow: rgba(0, 0, 0, 0.1);
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2d2d2d;
+            --bg-tertiary: #404040;
+            --text-primary: #ffffff;
+            --text-secondary: #b0b0b0;
+            --accent: #4da6ff;
+            --accent-hover: #3d8ce0;
+            --border: #404040;
+            --shadow: rgba(0, 0, 0, 0.3);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            transition: all 0.3s ease;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 40px 0;
+            background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+            color: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px var(--shadow);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 30px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-secondary);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+
+        .file-input {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .file-input-label {
+            padding: 12px 24px;
+            background: var(--success);
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .file-input-label:hover {
+            background: #218838;
+            transform: translateY(-2px);
+        }
+
+        .search-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex: 1;
+            max-width: 400px;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            transition: border-color 0.3s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .theme-toggle {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .theme-toggle:hover {
+            background: var(--bg-secondary);
+        }
+
+        .progress {
+            margin: 20px 0;
+            padding: 20px;
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--success));
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        .status {
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .text-output {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px;
+            min-height: 400px;
+            max-height: 600px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .text-output::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .text-output::-webkit-scrollbar-track {
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+        }
+
+        .text-output::-webkit-scrollbar-thumb {
+            background: var(--accent);
+            border-radius: 4px;
+        }
+
+        .page-separator {
+            color: var(--accent);
+            font-weight: bold;
+            margin: 20px 0 10px 0;
+            padding: 5px 0;
+            border-top: 2px solid var(--accent);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .highlight {
+            background: #ffff00;
+            color: #000;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+
+        [data-theme="dark"] .highlight {
+            background: #ffeb3b;
+            color: #000;
+        }
+
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+            padding: 15px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--accent);
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .file-info {
+            background: var(--bg-secondary);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            margin: 15px 0;
+        }
+
+        .ocr-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .checkbox {
+            width: 18px;
+            height: 18px;
+        }
+
+        @media (max-width: 768px) {
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .control-group {
+                justify-content: center;
+            }
+            
+            .search-container {
+                max-width: none;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+<base target="_blank">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📄 PDF to Text Converter</h1>
+            <p>Extract text from PDF files instantly - completely client-side processing</p>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <div class="file-input-wrapper">
+                    <input type="file" id="pdfInput" class="file-input" accept=".pdf">
+                    <label for="pdfInput" class="file-input-label">📁 Choose PDF File</label>
+                </div>
+                <button id="extractBtn" class="btn btn-primary" disabled>🔍 Extract Text</button>
+            </div>
+
+            <div class="search-container">
+                <input type="text" id="searchInput" class="search-input" placeholder="Search in extracted text...">
+                <button id="searchBtn" class="btn btn-secondary" disabled>🔍</button>
+                <button id="clearSearchBtn" class="btn btn-secondary hidden">❌</button>
+            </div>
+
+            <div class="control-group">
+                <button id="downloadBtn" class="btn btn-secondary" disabled>💾 Download Text</button>
+                <button id="themeToggle" class="theme-toggle">🌙</button>
+            </div>
+        </div>
+
+        <div class="ocr-option hidden" id="ocrOption">
+            <input type="checkbox" id="enableOCR" class="checkbox">
+            <label for="enableOCR">Enable OCR for scanned PDFs (slower but more accurate)</label>
+        </div>
+
+        <div id="fileInfo" class="file-info hidden">
+            <strong>Selected file:</strong> <span id="fileName"></span> (<span id="fileSize"></span>)
+        </div>
+
+        <div id="progress" class="progress hidden">
+            <div class="status" id="statusText">Preparing to extract text...</div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+            </div>
+            <div id="progressText">0%</div>
+        </div>
+
+        <div id="stats" class="stats hidden">
+            <div class="stat-item">
+                <div class="stat-value" id="pageCount">0</div>
+                <div class="stat-label">Pages</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="charCount">0</div>
+                <div class="stat-label">Characters</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="wordCount">0</div>
+                <div class="stat-label">Words</div>
+            </div>
+        </div>
+
+        <div id="textOutput" class="text-output hidden"></div>
+    </div>
+
+    <script>
+        class PDFTextExtractor {
+            constructor() {
+                this.currentPdf = null;
+                this.extractedText = '';
+                this.isDarkMode = false;
+                this.searchTerm = '';
+                
+                this.initializeElements();
+                this.setupEventListeners();
+                this.setupPDFJS();
+                this.loadTheme();
+            }
+
+            initializeElements() {
+                this.elements = {
+                    pdfInput: document.getElementById('pdfInput'),
+                    extractBtn: document.getElementById('extractBtn'),
+                    searchInput: document.getElementById('searchInput'),
+                    searchBtn: document.getElementById('searchBtn'),
+                    clearSearchBtn: document.getElementById('clearSearchBtn'),
+                    downloadBtn: document.getElementById('downloadBtn'),
+                    themeToggle: document.getElementById('themeToggle'),
+                    progress: document.getElementById('progress'),
+                    progressFill: document.getElementById('progressFill'),
+                    statusText: document.getElementById('statusText'),
+                    progressText: document.getElementById('progressText'),
+                    textOutput: document.getElementById('textOutput'),
+                    fileInfo: document.getElementById('fileInfo'),
+                    fileName: document.getElementById('fileName'),
+                    fileSize: document.getElementById('fileSize'),
+                    stats: document.getElementById('stats'),
+                    pageCount: document.getElementById('pageCount'),
+                    charCount: document.getElementById('charCount'),
+                    wordCount: document.getElementById('wordCount'),
+                    ocrOption: document.getElementById('ocrOption'),
+                    enableOCR: document.getElementById('enableOCR')
+                };
+            }
+
+            setupPDFJS() {
+                // Configure PDF.js worker
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.worker.min.js';
+            }
+
+            setupEventListeners() {
+                this.elements.pdfInput.addEventListener('change', (e) => this.handleFileSelect(e));
+                this.elements.extractBtn.addEventListener('click', () => this.extractText());
+                this.elements.searchBtn.addEventListener('click', () => this.searchText());
+                this.elements.clearSearchBtn.addEventListener('click', () => this.clearSearch());
+                this.elements.downloadBtn.addEventListener('click', () => this.downloadText());
+                this.elements.themeToggle.addEventListener('click', () => this.toggleTheme());
+                this.elements.searchInput.addEventListener('input', () => this.handleSearchInput());
+                this.elements.searchInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.searchText();
+                });
+            }
+
+            handleFileSelect(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                if (file.type !== 'application/pdf') {
+                    alert('Please select a PDF file.');
+                    return;
+                }
+
+                this.currentPdf = file;
+                this.elements.fileName.textContent = file.name;
+                this.elements.fileSize.textContent = this.formatFileSize(file.size);
+                this.elements.fileInfo.classList.remove('hidden');
+                this.elements.extractBtn.disabled = false;
+                this.elements.ocrOption.classList.remove('hidden');
+                
+                // Reset previous results
+                this.resetOutput();
+            }
+
+            formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+
+            resetOutput() {
+                this.elements.textOutput.textContent = '';
+                this.elements.textOutput.classList.add('hidden');
+                this.elements.stats.classList.add('hidden');
+                this.elements.downloadBtn.disabled = true;
+                this.elements.searchBtn.disabled = true;
+                this.elements.searchInput.value = '';
+                this.clearSearch();
+            }
+
+            async extractText() {
+                if (!this.currentPdf) return;
+
+                this.showProgress();
+                this.elements.extractBtn.disabled = true;
+
+                try {
+                    const arrayBuffer = await this.readFileAsArrayBuffer(this.currentPdf);
+                    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                    
+                    let fullText = '';
+                    const totalPages = pdf.numPages;
+                    
+                    for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+                        this.updateProgress(pageNum, totalPages, `Extracting page ${pageNum} of ${totalPages}...`);
+                        
+                        const page = await pdf.getPage(pageNum);
+                        const textContent = await page.getTextContent();
+                        
+                        // Check if page has text content
+                        const hasText = textContent.items.length > 0;
+                        
+                        if (hasText) {
+                            // Extract text normally
+                            const pageText = textContent.items.map(item => item.str).join(' ');
+                            fullText += `\n\n--- Page ${pageNum} ---\n\n${pageText}`;
+                        } else if (this.elements.enableOCR.checked) {
+                            // Perform OCR for scanned pages
+                            this.updateProgress(pageNum, totalPages, `Performing OCR on page ${pageNum}...`);
+                            const ocrText = await this.performOCR(page);
+                            fullText += `\n\n--- Page ${pageNum} (OCR) ---\n\n${ocrText}`;
+                        } else {
+                            fullText += `\n\n--- Page ${pageNum} ---\n\n[No text content found - this may be a scanned image. Enable OCR for better results.]`;
+                        }
+                    }
+
+                    this.extractedText = fullText.trim();
+                    this.displayText(this.extractedText);
+                    this.updateStats(totalPages);
+                    this.elements.downloadBtn.disabled = false;
+                    this.elements.searchBtn.disabled = false;
+                    
+                } catch (error) {
+                    console.error('Error extracting text:', error);
+                    alert('Error extracting text from PDF: ' + error.message);
+                } finally {
+                    this.hideProgress();
+                    this.elements.extractBtn.disabled = false;
+                }
+            }
+
+            async performOCR(page) {
+                try {
+                    // Get page as image for OCR
+                    const viewport = page.getViewport({ scale: 2.0 });
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    
+                    await page.render({
+                        canvasContext: context,
+                        viewport: viewport
+                    }).promise;
+                    
+                    return new Promise((resolve, reject) => {
+                        Tesseract.recognize(canvas, 'eng', {
+                            logger: (m) => {
+                                if (m.status === 'recognizing text') {
+                                    this.updateProgress(m.progress * 100, 100, `OCR: ${Math.round(m.progress * 100)}%`);
+                                }
+                            }
+                        }).then(({ data: { text } }) => {
+                            resolve(text);
+                        }).catch(reject);
+                    });
+                } catch (error) {
+                    return `[OCR failed: ${error.message}]`;
+                }
+            }
+
+            readFileAsArrayBuffer(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(e.target.result);
+                    reader.onerror = reject;
+                    reader.readAsArrayBuffer(file);
+                });
+            }
+
+            displayText(text) {
+                this.elements.textOutput.textContent = text;
+                this.elements.textOutput.classList.remove('hidden');
+            }
+
+            updateStats(totalPages) {
+                const charCount = this.extractedText.length;
+                const wordCount = this.extractedText.split(/\s+/).filter(word => word.length > 0).length;
+                
+                this.elements.pageCount.textContent = totalPages;
+                this.elements.charCount.textContent = charCount.toLocaleString();
+                this.elements.wordCount.textContent = wordCount.toLocaleString();
+                this.elements.stats.classList.remove('hidden');
+            }
+
+            searchText() {
+                const searchTerm = this.elements.searchInput.value.trim();
+                if (!searchTerm || !this.extractedText) return;
+
+                this.searchTerm = searchTerm;
+                this.highlightSearchResults();
+                this.elements.clearSearchBtn.classList.remove('hidden');
+            }
+
+            handleSearchInput() {
+                const searchTerm = this.elements.searchInput.value.trim();
+                if (searchTerm === '') {
+                    this.clearSearch();
+                }
+            }
+
+            highlightSearchResults() {
+                const text = this.extractedText;
+                const regex = new RegExp(`(${this.escapeRegExp(this.searchTerm)})`, 'gi');
+                const highlightedText = text.replace(regex, '<span class="highlight">$1</span>');
+                
+                this.elements.textOutput.innerHTML = highlightedText;
+                
+                // Scroll to first occurrence
+                const firstHighlight = this.elements.textOutput.querySelector('.highlight');
+                if (firstHighlight) {
+                    firstHighlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+
+            clearSearch() {
+                this.searchTerm = '';
+                this.elements.searchInput.value = '';
+                this.elements.clearSearchBtn.classList.add('hidden');
+                
+                if (this.extractedText) {
+                    this.displayText(this.extractedText);
+                }
+            }
+
+            escapeRegExp(string) {
+                return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            }
+
+            downloadText() {
+                if (!this.extractedText) return;
+
+                const blob = new Blob([this.extractedText], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `extracted_text_${new Date().getTime()}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+
+            toggleTheme() {
+                this.isDarkMode = !this.isDarkMode;
+                document.documentElement.setAttribute('data-theme', this.isDarkMode ? 'dark' : 'light');
+                this.elements.themeToggle.textContent = this.isDarkMode ? '☀️' : '🌙';
+                localStorage.setItem('darkMode', this.isDarkMode);
+            }
+
+            loadTheme() {
+                const savedTheme = localStorage.getItem('darkMode');
+                if (savedTheme === 'true') {
+                    this.isDarkMode = true;
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    this.elements.themeToggle.textContent = '☀️';
+                }
+            }
+
+            showProgress() {
+                this.elements.progress.classList.remove('hidden');
+                this.updateProgress(0, 100, 'Starting extraction...');
+            }
+
+            hideProgress() {
+                this.elements.progress.classList.add('hidden');
+            }
+
+            updateProgress(current, total, status) {
+                const percentage = Math.round((current / total) * 100);
+                this.elements.progressFill.style.width = `${percentage}%`;
+                this.elements.progressText.textContent = `${percentage}%`;
+                this.elements.statusText.textContent = status;
+            }
+        }
+
+        // Initialize the application when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            new PDFTextExtractor();
+        });
+    </script>
+</body>
+</html>
